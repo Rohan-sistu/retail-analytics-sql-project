@@ -1,0 +1,87 @@
+digraph ER {
+    rankdir=LR;
+    graph [fontname="Helvetica", bgcolor="white", nodesep=0.6, ranksep=0.9];
+    node [shape=plaintext, fontname="Helvetica"];
+    edge [fontname="Helvetica", fontsize=10, color="#555555", arrowsize=0.7];
+
+    categories [label=<
+        <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="6" BGCOLOR="white">
+        <TR><TD BGCOLOR="#1F3864"><FONT COLOR="white"><B>categories</B></FONT></TD></TR>
+        <TR><TD ALIGN="LEFT"><B>PK</B> category_id</TD></TR>
+        <TR><TD ALIGN="LEFT">category_name</TD></TR>
+        </TABLE>>];
+
+    customers [label=<
+        <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="6" BGCOLOR="white">
+        <TR><TD BGCOLOR="#1F3864"><FONT COLOR="white"><B>customers</B></FONT></TD></TR>
+        <TR><TD ALIGN="LEFT"><B>PK</B> customer_id</TD></TR>
+        <TR><TD ALIGN="LEFT">first_name</TD></TR>
+        <TR><TD ALIGN="LEFT">last_name</TD></TR>
+        <TR><TD ALIGN="LEFT">email</TD></TR>
+        <TR><TD ALIGN="LEFT">city / region / country</TD></TR>
+        <TR><TD ALIGN="LEFT">signup_date</TD></TR>
+        <TR><TD ALIGN="LEFT">customer_segment</TD></TR>
+        </TABLE>>];
+
+    products [label=<
+        <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="6" BGCOLOR="white">
+        <TR><TD BGCOLOR="#1F3864"><FONT COLOR="white"><B>products</B></FONT></TD></TR>
+        <TR><TD ALIGN="LEFT"><B>PK</B> product_id</TD></TR>
+        <TR><TD ALIGN="LEFT">product_name</TD></TR>
+        <TR><TD ALIGN="LEFT"><B>FK</B> category_id</TD></TR>
+        <TR><TD ALIGN="LEFT">brand</TD></TR>
+        <TR><TD ALIGN="LEFT">unit_price</TD></TR>
+        <TR><TD ALIGN="LEFT">cost_price</TD></TR>
+        </TABLE>>];
+
+    orders [label=<
+        <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="6" BGCOLOR="white">
+        <TR><TD BGCOLOR="#1F3864"><FONT COLOR="white"><B>orders</B></FONT></TD></TR>
+        <TR><TD ALIGN="LEFT"><B>PK</B> order_id</TD></TR>
+        <TR><TD ALIGN="LEFT"><B>FK</B> customer_id</TD></TR>
+        <TR><TD ALIGN="LEFT">order_date</TD></TR>
+        <TR><TD ALIGN="LEFT">order_status</TD></TR>
+        <TR><TD ALIGN="LEFT">region</TD></TR>
+        </TABLE>>];
+
+    order_items [label=<
+        <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="6" BGCOLOR="white">
+        <TR><TD BGCOLOR="#1F3864"><FONT COLOR="white"><B>order_items</B></FONT></TD></TR>
+        <TR><TD ALIGN="LEFT"><B>PK</B> order_item_id</TD></TR>
+        <TR><TD ALIGN="LEFT"><B>FK</B> order_id</TD></TR>
+        <TR><TD ALIGN="LEFT"><B>FK</B> product_id</TD></TR>
+        <TR><TD ALIGN="LEFT">quantity</TD></TR>
+        <TR><TD ALIGN="LEFT">unit_price</TD></TR>
+        <TR><TD ALIGN="LEFT">discount_pct</TD></TR>
+        </TABLE>>];
+
+    payments [label=<
+        <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="6" BGCOLOR="white">
+        <TR><TD BGCOLOR="#1F3864"><FONT COLOR="white"><B>payments</B></FONT></TD></TR>
+        <TR><TD ALIGN="LEFT"><B>PK</B> payment_id</TD></TR>
+        <TR><TD ALIGN="LEFT"><B>FK</B> order_id</TD></TR>
+        <TR><TD ALIGN="LEFT">payment_method</TD></TR>
+        <TR><TD ALIGN="LEFT">payment_amount</TD></TR>
+        <TR><TD ALIGN="LEFT">payment_date</TD></TR>
+        <TR><TD ALIGN="LEFT">payment_status</TD></TR>
+        </TABLE>>];
+
+    reviews [label=<
+        <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="6" BGCOLOR="white">
+        <TR><TD BGCOLOR="#1F3864"><FONT COLOR="white"><B>reviews</B></FONT></TD></TR>
+        <TR><TD ALIGN="LEFT"><B>PK</B> review_id</TD></TR>
+        <TR><TD ALIGN="LEFT"><B>FK</B> order_item_id</TD></TR>
+        <TR><TD ALIGN="LEFT"><B>FK</B> customer_id</TD></TR>
+        <TR><TD ALIGN="LEFT">rating</TD></TR>
+        <TR><TD ALIGN="LEFT">review_date</TD></TR>
+        <TR><TD ALIGN="LEFT">review_text</TD></TR>
+        </TABLE>>];
+
+    categories -> products      [label="1 to many"];
+    customers  -> orders        [label="1 to many"];
+    customers  -> reviews       [label="1 to many"];
+    orders     -> order_items   [label="1 to many"];
+    products   -> order_items   [label="1 to many"];
+    orders     -> payments      [label="1 to many"];
+    order_items -> reviews      [label="0/1 to many"];
+}
