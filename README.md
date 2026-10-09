@@ -2,7 +2,7 @@
 
 An end-to-end PostgreSQL analytics project: a messy raw dataset, a documented
 cleaning pipeline, a normalized relational schema, and 30 interview-quality
-SQL queries covering joins, window functions, CTEs, and business analysis —
+SQL queries covering joins, window functions, CTEs, and business analysis
 all executed and verified against a live PostgreSQL 16 database.
 
 ## A note on the data, upfront
@@ -18,13 +18,13 @@ shaped to resemble a real mid-size online retailer:
 - Skewed customer behavior (15% of customers drive ~50% of orders) instead
   of uniform randomness, so retention/cohort/top-customer queries return
   realistic, non-trivial results
-- **Intentional data quality problems** injected into the raw data —
+- **Intentional data quality problems** injected into the raw data
   duplicate rows, inconsistent casing, blank fields, sign errors, orphaned
-  foreign keys, out-of-range values — so the cleaning script in this repo
+  foreign keys, out-of-range values, so the cleaning script in this repo
   solves a real problem instead of a decorative one
 
 Designing the schema and generating valid relational data at this scale is
-itself a real, demonstrable skill — and every query below was run against
+itself a real, demonstrable skill and every query below was run against
 the actual resulting database, not written speculatively.
 
 ## Folder structure
