@@ -1,12 +1,17 @@
- category_id | product_id |                product_name                | units_sold 
--------------+------------+--------------------------------------------+------------
-           1 |        186 | Synchronized 24/7 website                  |       1053
-           2 |         81 | Horizontal demand-driven Internet solution |       1073
-           3 |        101 | Operative national synergy                 |       1035
-           4 |        232 | Versatile interactive success              |       1037
-           5 |         75 | Ergonomic eco-centric analyzer             |       1107
-           6 |        110 | Ameliorated regional collaboration         |       1034
-           7 |        174 | Profit-focused optimizing groupware        |       1013
-           8 |        189 | Networked mission-critical benchmark       |       1069
-(8 rows)
+ category_id | product_id |                  product_name                  | units_sold 
+-------------+------------+------------------------------------------------+------------
+           1 |        210 | Organic leadingedge encoding                   |        951
+           2 |         36 | De-engineered uniform orchestration            |        984
+           3 |        101 | Operative national synergy                     |        933
+           4 |         16 | Re-contextualized transitional functionalities |        981
+           5 |        148 | Down-sized fault-tolerant policy               |       1021
+           6 |        201 | Synergistic hybrid website                     |        981
+           7 |        174 | Profit-focused optimizing groupware            |        942
+           8 |        189 | Networked mission-critical benchmark           |       1008
+           9 |         30 | Robust interactive data-warehouse              |        966
+          10 |        128 | Reactive multi-tasking hardware                |        952
+          10 |        156 | Open-source system-worthy methodology          |        952
+          11 |         26 | Quality-focused zero-defect moderator          |        973
+          12 |        204 | Assimilated regional open architecture         |        952
+(13 rows)
 

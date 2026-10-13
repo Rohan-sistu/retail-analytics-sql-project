@@ -1,14 +1,14 @@
  product_id |                product_name                | units_sold | total_revenue 
 ------------+--------------------------------------------+------------+---------------
-         81 | Horizontal demand-driven Internet solution |       1073 |    1038629.45
-         87 | Re-engineered content-based structure      |       1159 |     962202.97
-        151 | Inverse real-time extranet                 |       1072 |     934611.48
-         58 | Expanded systemic productivity             |        983 |     915852.38
-         10 | Switchable discrete throughput             |        945 |     914488.31
-         69 | Persevering grid-enabled function          |        982 |     892868.17
-        142 | Virtual demand-driven product              |        995 |     834604.38
-         60 | Managed zero administration capacity       |       1031 |     830875.85
-         90 | Decentralized logistical challenge         |       1001 |     816297.24
-        194 | Versatile uniform throughput               |        950 |     796506.43
+         81 | Horizontal demand-driven Internet solution |        966 |     935553.15
+         87 | Re-engineered content-based structure      |       1072 |     891059.21
+        151 | Inverse real-time extranet                 |        991 |     864344.77
+         58 | Expanded systemic productivity             |        922 |     858832.23
+         10 | Switchable discrete throughput             |        872 |     846257.26
+         69 | Persevering grid-enabled function          |        915 |     831998.40
+         60 | Managed zero administration capacity       |        964 |     776691.99
+        142 | Virtual demand-driven product              |        905 |     758791.50
+         90 | Decentralized logistical challenge         |        919 |     750155.00
+         20 | Distributed responsive complexity          |        991 |     739357.28
 (10 rows)
 

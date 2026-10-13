@@ -14,13 +14,17 @@
 
 -- Q1. Top 10 best-selling products by revenue
 -- Technique: INNER JOIN, GROUP BY, aggregate functions, ORDER BY / LIMIT
+-- Revenue definition used in every query: net of line discount, excluding
+-- cancelled orders (cancelled orders hold 8.4% of gross line value).
 SELECT
     p.product_id,
     p.product_name,
     SUM(oi.quantity)                                   AS units_sold,
     ROUND(SUM(oi.quantity * oi.unit_price * (1 - oi.discount_pct / 100.0)), 2) AS total_revenue
 FROM order_items oi
+INNER JOIN orders o   ON o.order_id = oi.order_id
 INNER JOIN products p ON p.product_id = oi.product_id
+WHERE o.order_status <> 'cancelled'
 GROUP BY p.product_id, p.product_name
 ORDER BY total_revenue DESC
 LIMIT 10;
@@ -113,8 +117,10 @@ WITH category_revenue AS (
         c.category_name,
         SUM(oi.quantity * oi.unit_price * (1 - oi.discount_pct / 100.0)) AS revenue
     FROM order_items oi
-    INNER JOIN products p ON p.product_id = oi.product_id
+    INNER JOIN orders o     ON o.order_id = oi.order_id
+    INNER JOIN products p   ON p.product_id = oi.product_id
     INNER JOIN categories c ON c.category_id = p.category_id
+    WHERE o.order_status <> 'cancelled'
     GROUP BY c.category_name
 )
 SELECT
@@ -175,19 +181,24 @@ WHERE prev_units_sold IS NOT NULL
 ORDER BY quarter DESC, (prev_units_sold - units_sold) DESC
 LIMIT 15;
 
--- Q10. Profit margin by product (unit_price vs. cost_price)
--- Technique: CASE WHEN, basic arithmetic
+-- Q10. Gross margin tier by product (list price vs. cost price)
+-- Technique: CASE WHEN, NULLIF, basic arithmetic
+-- Margin = profit / PRICE. (Profit / COST is markup, a different metric:
+-- a 100% markup is only a 50% margin. Mixing them up mis-tiers 84 of 250
+-- products in this catalogue.)
 SELECT
     product_id,
     product_name,
     unit_price,
     cost_price,
-    ROUND(unit_price - cost_price, 2) AS profit_per_unit,
+    ROUND(unit_price - cost_price, 2)                                  AS profit_per_unit,
+    ROUND(100 * (unit_price - cost_price) / NULLIF(unit_price, 0), 1)  AS gross_margin_pct,
+    ROUND(100 * (unit_price - cost_price) / NULLIF(cost_price, 0), 1)  AS markup_pct,
     CASE
-        WHEN cost_price = 0 THEN NULL
-        WHEN (unit_price - cost_price) / cost_price >= 0.5 THEN 'High margin'
-        WHEN (unit_price - cost_price) / cost_price >= 0.2 THEN 'Medium margin'
-        ELSE 'Low margin'
+        WHEN unit_price = 0 THEN NULL
+        WHEN (unit_price - cost_price) / unit_price >= 0.5 THEN 'High margin (>=50%)'
+        WHEN (unit_price - cost_price) / unit_price >= 0.2 THEN 'Medium margin (20-50%)'
+        ELSE 'Low margin (<20%)'
     END AS margin_tier
 FROM products
 ORDER BY profit_per_unit DESC
@@ -288,31 +299,42 @@ WHERE o.order_status <> 'cancelled'
 GROUP BY DATE_TRUNC('month', o.order_date)
 ORDER BY order_month;
 
--- Q17. Cohort analysis: monthly retention by signup cohort
--- Technique: CTE, DATE_TRUNC, self-referencing join, cohort matrix pattern
-WITH cohorts AS (
-    SELECT
-        customer_id,
-        DATE_TRUNC('month', signup_date)::DATE AS cohort_month
-    FROM customers
+-- Q17. Cohort analysis: repeat-purchase rate by first-purchase quarter
+-- Technique: CTEs, MIN() FILTER, interval arithmetic, cohort retention %
+-- Cohorts are built on FIRST PURCHASE, not signup_date: a data-quality check
+-- (see 04_findings.sql, DQ1) found 8,947 orders (41%) dated before the
+-- customer's signup date, so signup-based cohorts would be unreliable.
+-- Caveats: the 2022-Q1 cohort is inflated because customers who bought
+-- before the data starts look "new"; cohorts from 2024 have not had a full
+-- 365 days to repeat, so their 365-day rate is understated.
+WITH valid_orders AS (
+    SELECT customer_id, order_date
+    FROM orders
+    WHERE order_status <> 'cancelled'
 ),
-activity AS (
+first_purchase AS (
+    SELECT customer_id, MIN(order_date) AS first_dt
+    FROM valid_orders
+    GROUP BY customer_id
+),
+second_purchase AS (
     SELECT
-        o.customer_id,
-        DATE_TRUNC('month', o.order_date)::DATE AS activity_month
-    FROM orders o
-    WHERE o.order_status <> 'cancelled'
+        f.customer_id,
+        DATE_TRUNC('quarter', f.first_dt)::DATE                        AS cohort_quarter,
+        f.first_dt,
+        MIN(v.order_date) FILTER (WHERE v.order_date > f.first_dt)     AS second_dt
+    FROM first_purchase f
+    INNER JOIN valid_orders v ON v.customer_id = f.customer_id
+    GROUP BY f.customer_id, cohort_quarter, f.first_dt
 )
 SELECT
-    co.cohort_month,
-    (EXTRACT(YEAR FROM a.activity_month) - EXTRACT(YEAR FROM co.cohort_month)) * 12
-        + (EXTRACT(MONTH FROM a.activity_month) - EXTRACT(MONTH FROM co.cohort_month)) AS months_since_signup,
-    COUNT(DISTINCT a.customer_id) AS active_customers
-FROM cohorts co
-INNER JOIN activity a ON a.customer_id = co.customer_id
-GROUP BY co.cohort_month, months_since_signup
-ORDER BY co.cohort_month, months_since_signup
-LIMIT 30;
+    cohort_quarter,
+    COUNT(*)                                                                    AS new_buyers,
+    ROUND(100.0 * COUNT(*) FILTER (WHERE second_dt <= first_dt + INTERVAL '90 days')  / COUNT(*), 1) AS repeat_within_90d_pct,
+    ROUND(100.0 * COUNT(*) FILTER (WHERE second_dt <= first_dt + INTERVAL '365 days') / COUNT(*), 1) AS repeat_within_365d_pct
+FROM second_purchase
+GROUP BY cohort_quarter
+ORDER BY cohort_quarter;
 
 -- Q18. Customer churn flag: no order in the last 180 days but has ordered before
 -- Technique: CTE, CASE WHEN, date arithmetic
@@ -337,42 +359,55 @@ ORDER BY most_recent_order ASC
 LIMIT 20;
 
 -- Q19. Days between a customer's first and second order (time to repeat purchase)
--- Technique: Window function LEAD(), subquery
+-- Technique: Window functions LEAD() + ROW_NUMBER()
+-- ROW_NUMBER() = 1 keeps only each customer's FIRST order; without it,
+-- LEAD() returns every consecutive pair (16,414 rows instead of 3,058).
 WITH ordered_dates AS (
     SELECT
         customer_id,
         order_date,
-        LEAD(order_date) OVER (PARTITION BY customer_id ORDER BY order_date) AS next_order_date
+        LEAD(order_date)  OVER (PARTITION BY customer_id ORDER BY order_date) AS next_order_date,
+        ROW_NUMBER()      OVER (PARTITION BY customer_id ORDER BY order_date) AS order_seq
     FROM orders
     WHERE order_status <> 'cancelled'
 )
 SELECT
     customer_id,
-    order_date        AS first_order,
-    next_order_date   AS second_order,
-    (next_order_date - order_date) AS days_to_repeat_purchase
+    order_date                                    AS first_order,
+    next_order_date                               AS second_order,
+    (next_order_date::DATE - order_date::DATE)    AS days_to_repeat_purchase
 FROM ordered_dates
-WHERE next_order_date IS NOT NULL
+WHERE order_seq = 1
+  AND next_order_date IS NOT NULL
 ORDER BY days_to_repeat_purchase ASC
 LIMIT 20;
 
 -- Q20. Customers whose average order value exceeds the company-wide average
--- Technique: Subquery in WHERE clause (scalar subquery)
+-- Technique: CTE to change the grain (line -> order), scalar subquery in HAVING
+-- Order totals are built first: averaging order_items directly would give
+-- average LINE value (EUR 1,361), not average ORDER value (EUR 4,008).
+-- The benchmark uses the same CTE, so both sides exclude cancelled orders.
+WITH order_totals AS (
+    SELECT
+        o.customer_id,
+        o.order_id,
+        SUM(oi.quantity * oi.unit_price * (1 - oi.discount_pct / 100.0)) AS order_total
+    FROM orders o
+    INNER JOIN order_items oi ON oi.order_id = o.order_id
+    WHERE o.order_status <> 'cancelled'
+    GROUP BY o.customer_id, o.order_id
+)
 SELECT
     c.customer_id,
     c.first_name,
     c.last_name,
-    ROUND(AVG(oi.quantity * oi.unit_price * (1 - oi.discount_pct / 100.0)), 2) AS avg_customer_order_value
-FROM customers c
-INNER JOIN orders o ON o.customer_id = c.customer_id
-INNER JOIN order_items oi ON oi.order_id = o.order_id
-WHERE o.order_status <> 'cancelled'
+    COUNT(*)                       AS orders,
+    ROUND(AVG(ot.order_total), 2)  AS customer_aov
+FROM order_totals ot
+INNER JOIN customers c ON c.customer_id = ot.customer_id
 GROUP BY c.customer_id, c.first_name, c.last_name
-HAVING AVG(oi.quantity * oi.unit_price * (1 - oi.discount_pct / 100.0)) > (
-    SELECT AVG(oi2.quantity * oi2.unit_price * (1 - oi2.discount_pct / 100.0))
-    FROM order_items oi2
-)
-ORDER BY avg_customer_order_value DESC
+HAVING AVG(ot.order_total) > (SELECT AVG(order_total) FROM order_totals)
+ORDER BY customer_aov DESC
 LIMIT 15;
 
 
@@ -390,21 +425,24 @@ FROM orders
 GROUP BY order_status
 ORDER BY order_count DESC;
 
--- Q22. Return rate by product category
--- Technique: INNER JOIN, CASE WHEN, GROUP BY, HAVING
+-- Q22. Return rate by product category (orders containing that category)
+-- Technique: INNER JOIN, COUNT(DISTINCT ...) FILTER, GROUP BY, HAVING
+-- COUNT(DISTINCT order_id): the join produces one row per order LINE, so a
+-- plain COUNT(*) would weight multi-line orders more than single-line ones.
 SELECT
     c.category_name,
-    COUNT(*) FILTER (WHERE o.order_status = 'returned')      AS returned_orders,
-    COUNT(*)                                                  AS total_orders,
+    COUNT(DISTINCT o.order_id) FILTER (WHERE o.order_status = 'returned')  AS returned_orders,
+    COUNT(DISTINCT o.order_id)                                             AS total_orders,
     ROUND(
-        COUNT(*) FILTER (WHERE o.order_status = 'returned') * 100.0 / COUNT(*), 2
+        COUNT(DISTINCT o.order_id) FILTER (WHERE o.order_status = 'returned') * 100.0
+        / COUNT(DISTINCT o.order_id), 2
     ) AS return_rate_pct
 FROM orders o
 INNER JOIN order_items oi ON oi.order_id = o.order_id
 INNER JOIN products p ON p.product_id = oi.product_id
 INNER JOIN categories c ON c.category_id = p.category_id
 GROUP BY c.category_name
-HAVING COUNT(*) > 100
+HAVING COUNT(DISTINCT o.order_id) > 100
 ORDER BY return_rate_pct DESC;
 
 -- Q23. Products never reviewed despite having 10+ sales (quality/visibility gap)
@@ -486,7 +524,9 @@ WITH product_sales AS (
         SUM(oi.quantity) AS units_sold,
         DENSE_RANK() OVER (PARTITION BY p.category_id ORDER BY SUM(oi.quantity) DESC) AS sales_rank
     FROM order_items oi
+    INNER JOIN orders o   ON o.order_id = oi.order_id
     INNER JOIN products p ON p.product_id = oi.product_id
+    WHERE o.order_status <> 'cancelled'
     GROUP BY p.category_id, p.product_id, p.product_name
 )
 SELECT category_id, product_id, product_name, units_sold
@@ -506,27 +546,32 @@ GROUP BY customer_id
 ORDER BY days_since_last_order DESC
 LIMIT 15;
 
--- Q29. Category-level inventory value estimate (unit count x cost) with
---      running share-of-total using a window function
--- Technique: INNER JOIN, GROUP BY, window function
-WITH category_value AS (
+-- Q29. Realised gross margin by category, with cumulative share of gross profit
+-- Technique: multi-table JOIN, GROUP BY, window function (running total)
+-- (Replaces an earlier "inventory value" query: the schema has no stock
+-- levels, so summing catalogue cost prices did not measure inventory.)
+WITH category_profit AS (
     SELECT
         c.category_name,
-        COUNT(p.product_id)                 AS num_products,
-        ROUND(SUM(p.cost_price), 2)          AS total_catalog_cost_value
-    FROM products p
+        SUM(oi.quantity * oi.unit_price * (1 - oi.discount_pct / 100.0))  AS revenue,
+        SUM(oi.quantity * oi.unit_price * (1 - oi.discount_pct / 100.0)
+            - oi.quantity * p.cost_price)                                  AS gross_profit
+    FROM order_items oi
+    INNER JOIN orders o     ON o.order_id = oi.order_id
+    INNER JOIN products p   ON p.product_id = oi.product_id
     INNER JOIN categories c ON c.category_id = p.category_id
+    WHERE o.order_status <> 'cancelled'
     GROUP BY c.category_name
 )
 SELECT
     category_name,
-    num_products,
-    total_catalog_cost_value,
-    ROUND(
-        SUM(total_catalog_cost_value) OVER (ORDER BY total_catalog_cost_value DESC), 2
-    ) AS running_cumulative_value
-FROM category_value
-ORDER BY total_catalog_cost_value DESC;
+    ROUND(revenue, 2)                               AS revenue,
+    ROUND(gross_profit, 2)                          AS gross_profit,
+    ROUND(100 * gross_profit / revenue, 1)          AS gross_margin_pct,
+    ROUND(100 * SUM(gross_profit) OVER (ORDER BY gross_profit DESC)
+              / SUM(gross_profit) OVER (), 1)       AS cumulative_profit_share_pct
+FROM category_profit
+ORDER BY gross_profit DESC;
 
 -- Q30. Full business summary: orders, revenue, AOV, and review score per
 --      region and quarter — a typical "give me an executive summary table"

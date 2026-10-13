@@ -11,6 +11,7 @@ SS_DIR = Path(__file__).resolve().parent.parent / "screenshots"
 FILES = {
     "q01_output.txt": "Q1 — Top 10 Best-Selling Products by Revenue",
     "q03_output.txt": "Q3 — Month-over-Month Revenue Growth % (LAG window function)",
+    "q17_output.txt": "Q17 — Repeat-Purchase Rate by First-Purchase Cohort (CTEs, FILTER)",
     "q27_output.txt": "Q27 — Second-Best-Selling Product per Category (DENSE_RANK)",
 }
 
